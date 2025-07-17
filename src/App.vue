@@ -1,66 +1,6 @@
-<template>
-  <div class="app-container">
-    <h1>タスク管理アプリ</h1>
-
-    <!-- 🔧 タイマー表示切替 -->
-    <label class="timer-toggle">
-      <input type="checkbox" v-model="showTimer" />
-      1番期限の近いタスクの締切タイマーを表示
-    </label>
-
-    <!-- ⏱ タイマー -->
-    <div v-if="showTimer && nearestTask" class="deadline-timer">
-      🕒 締切間近: 「{{ nearestTask.text }}」
-      <br />
-      <span v-if="timeLeft.total > 0">
-        残り: {{ timeLeft.hours }}時間 {{ timeLeft.minutes }}分 {{ timeLeft.seconds }}秒
-      </span>
-      <span v-else class="overdue-text">締切超過！</span>
-    </div>
-
-    <!-- フォーム -->
-    <form class="task-form" @submit.prevent="addTask">
-      <input v-model="newTask.text" placeholder="タスク内容" required />
-      <input v-model="newTask.due" type="datetime-local" />
-      <input v-model="newTask.note" placeholder="メモ" />
-      <button type="submit">追加</button>
-    </form>
-
-    <!-- 一括操作 -->
-    <div class="bulk-actions">
-      <button @click="markAllDone">すべて完了にする</button>
-    </div>
-
-    <!-- フィルター -->
-    <div class="filters">
-      <button @click="setFilter('all')" :class="{ active: filter === 'all' }">すべて</button>
-      <button @click="setFilter('active')" :class="{ active: filter === 'active' }">未完了</button>
-      <button @click="setFilter('done')" :class="{ active: filter === 'done' }">完了</button>
-    </div>
-
-    <!-- タスクリスト -->
-    <ul class="task-list">
-      <li
-        v-for="(task, index) in sortedTasks"
-        :key="task.id"
-        :class="{
-          overdue: isOverdue(task) && !task.done,
-          nearest: nearestTask && task.id === nearestTask.id,
-          done: task.done
-        }"
-      >
-        <input type="checkbox" v-model="task.done" @change="saveTasks" />
-        <input v-model="task.text" @blur="saveTasks" />
-        <input type="datetime-local" v-model="task.due" @change="saveTasks" />
-        <input v-model="task.note" @blur="saveTasks" />
-        <button @click="deleteTask(index)">削除</button>
-      </li>
-    </ul>
-  </div>
-</template>
-
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import TaskItem from './TaskItem.vue'
 
 const STORAGE_KEY = 'my-tasks'
 const FILTER_KEY = 'task-filter'
@@ -129,7 +69,6 @@ const sortedTasks = computed(() => {
   })
 })
 
-// タイマー機能
 const nearestTask = computed(() => {
   return tasks.value
     .filter(t => !t.done && t.due)
@@ -165,16 +104,101 @@ onBeforeUnmount(() => {
 watch(tasks, saveTasks, { deep: true })
 </script>
 
+<template>
+  <div class="app-container">
+    <h1>タスク管理アプリ</h1>
+
+    <label class="timer-toggle">
+      <input type="checkbox" v-model="showTimer" />
+      1番期限の近いタスクの締切タイマーを表示
+    </label>
+
+    <div v-if="showTimer && nearestTask" class="deadline-timer" role="region" aria-live="polite" aria-atomic="true">
+      🕒 締切間近: 「{{ nearestTask.text }}」<br />
+      <span v-if="timeLeft.total > 0">
+        残り: {{ timeLeft.hours }}時間 {{ timeLeft.minutes }}分 {{ timeLeft.seconds }}秒
+      </span>
+      <span v-else class="overdue-text">締切超過！</span>
+    </div>
+
+    <form class="task-form" @submit.prevent="addTask" aria-label="新しいタスクの追加フォーム">
+      <input
+        v-model="newTask.text"
+        type="text"
+        placeholder="タスク内容"
+        required
+        autocomplete="off"
+      />
+      <input
+        v-model="newTask.due"
+        type="datetime-local"
+        autocomplete="off"
+      />
+      <input
+        v-model="newTask.note"
+        placeholder="メモ"
+        autocomplete="off"
+      />
+      <button type="submit" aria-label="タスクを追加">追加</button>
+    </form>
+
+    <div class="bulk-actions">
+      <button @click="markAllDone" aria-label="すべてのタスクを完了にする">すべて完了にする</button>
+    </div>
+
+    <div class="filters" role="group" aria-label="タスクの表示フィルター">
+      <button
+        @click="setFilter('all')"
+        :class="{ active: filter === 'all' }"
+        :aria-pressed="filter === 'all'"
+      >すべて</button>
+      <button
+        @click="setFilter('active')"
+        :class="{ active: filter === 'active' }"
+        :aria-pressed="filter === 'active'"
+      >未完了</button>
+      <button
+        @click="setFilter('done')"
+        :class="{ active: filter === 'done' }"
+        :aria-pressed="filter === 'done'"
+      >完了</button>
+    </div>
+
+    <ul class="task-list" role="list" aria-label="タスクリスト">
+      <TaskItem
+        v-for="(task, index) in sortedTasks"
+        :key="task.id"
+        :task="task"
+        :isNearest="nearestTask && task.id === nearestTask.id"
+        @updateTask="saveTasks"
+        @deleteTask="deleteTask(index)"
+      />
+    </ul>
+  </div>
+</template>
+
 <style scoped>
 .app-container {
   max-width: 600px;
   margin: auto;
   padding: 1rem;
-  font-family: sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 h1 {
-  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #333;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 0.3rem;
+}
+
+.task-form {
+  background: #f0f8ff;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border: 1px solid #ccd;
 }
 
 .task-form input,
@@ -182,57 +206,38 @@ h1 {
   margin: 0.3rem;
   padding: 0.4rem;
   font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }
 
-.task-list {
-  list-style: none;
-  padding: 0;
+.task-form button {
+  background-color: #007bff;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-.task-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  margin: 0.5rem 0;
-  padding: 0.5rem;
-  background: #f7f7f7;
-  border-radius: 6px;
-  gap: 0.5rem;
-}
-
-.task-list li input[type="text"],
-.task-list li input[type="datetime-local"],
-.task-list li input[type="note"] {
-  flex: 1 1 100px;
-  padding: 0.3rem;
-  font-size: 0.9rem;
-}
-
-.task-list li button {
-  padding: 0.3rem 0.6rem;
-  font-size: 0.9rem;
-}
-
-.done input[type="text"] {
-  text-decoration: line-through;
-  color: #888;
-}
-
-.overdue {
-  color: red;
-}
-
-.nearest {
-  background-color: #ffecec !important;
+.task-form button:hover {
+  background-color: #0056b3;
 }
 
 .filters button {
   margin-right: 0.5rem;
   padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #f4f4f4;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.filters button:hover {
+  background: #e2e2e2;
 }
 
 .filters .active {
-  background-color: #007bff;
+  background-color: #007bff !important;
   color: white;
 }
 
@@ -243,8 +248,9 @@ h1 {
 .deadline-timer {
   margin: 1rem 0;
   padding: 0.6rem;
-  background: #fff8e1;
+  background: #fff4cc;
   border: 1px solid #f2d96b;
+  border-left: 5px solid #f0b400;
   border-radius: 6px;
   font-weight: bold;
 }
@@ -258,21 +264,18 @@ h1 {
   margin-bottom: 1rem;
 }
 
-@media (max-width: 600px) {
-  .task-list li {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+.task-list {
+  list-style: none;
+  padding: 0;
+}
 
+/* モバイル対応 */
+@media (max-width: 600px) {
   .task-form input,
-  .task-form button {
+  .task-form button,
+  .filters button {
     width: 100%;
     margin-bottom: 0.4rem;
-  }
-
-  .task-list li input,
-  .task-list li button {
-    width: 100%;
   }
 }
 </style>
